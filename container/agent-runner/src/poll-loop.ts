@@ -3,7 +3,7 @@ import { getPendingMessages, markProcessing, markCompleted, type MessageInRow } 
 import { writeMessageOut } from './db/messages-out.js';
 import { getInboundDb, touchHeartbeat, clearStaleProcessingAcks } from './db/connection.js';
 import { clearContinuation, migrateLegacyContinuation, setContinuation } from './db/session-state.js';
-import { clearCurrentInReplyTo, setCurrentInReplyTo } from './current-batch.js';
+import { clearCurrentInReplyTo, setCurrentInReplyTo, wasSentThisTurn } from './current-batch.js';
 import {
   formatMessages,
   extractRouting,
@@ -548,6 +548,13 @@ function dispatchResultText(text: string, routing: RoutingContext): { sent: numb
 }
 
 function sendToDestination(dest: DestinationEntry, body: string, routing: RoutingContext): void {
+  // Drop a final <message> block that exactly repeats something already sent
+  // via send_message this turn — the agent occasionally delivers its final
+  // result through both paths, which the user sees as a duplicate reply.
+  if (wasSentThisTurn(body)) {
+    log(`Skipping duplicate <message> block — already sent via send_message this turn`);
+    return;
+  }
   const platformId = dest.type === 'channel' ? dest.platformId! : dest.agentGroupId!;
   const channelType = dest.type === 'channel' ? dest.channelType! : 'agent';
   // Resolve thread_id per-destination from the most recent inbound message

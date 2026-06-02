@@ -15,8 +15,15 @@
  */
 let currentInReplyTo: string | null = null;
 
+// Contents already delivered this turn via send_message. Used to drop a
+// final-output <message> block that exactly repeats a mid-turn send_message —
+// the agent sometimes pushes its final result through both paths, which lands
+// as a duplicate reply. Keyed by trimmed text; reset at each turn start.
+const sentThisTurn = new Set<string>();
+
 export function setCurrentInReplyTo(id: string | null): void {
   currentInReplyTo = id;
+  sentThisTurn.clear();
 }
 
 export function clearCurrentInReplyTo(): void {
@@ -25,5 +32,13 @@ export function clearCurrentInReplyTo(): void {
 
 export function getCurrentInReplyTo(): string | null {
   return currentInReplyTo;
+}
+
+export function recordSentContent(text: string): void {
+  sentThisTurn.add(text.trim());
+}
+
+export function wasSentThisTurn(text: string): boolean {
+  return sentThisTurn.has(text.trim());
 }
 
